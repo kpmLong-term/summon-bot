@@ -11,6 +11,7 @@ from .art import render_card, render_spawn
 from .config import Settings
 from .db import Character, Weight
 from .game import RARITIES, normalize_name
+from .repo_extras import ensure_claim_list
 
 CAST: tuple[tuple[str, str, str], ...] = (
     ("Pebble Scout", "Road Lanterns", "common"),
@@ -51,6 +52,7 @@ async def seed(session: AsyncSession, settings: Settings) -> int:
     if weight_rows == 0:
         for rarity in RARITIES:
             session.add(Weight(chat_id=0, rarity=rarity.key, weight=rarity.weight))
+    await ensure_claim_list(session)
     await session.flush()
     characters = (await session.scalars(select(Character))).all()
     art_dir = settings.data_dir / "art"

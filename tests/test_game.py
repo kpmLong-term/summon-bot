@@ -83,6 +83,11 @@ def settings(tmp: Path) -> Settings:
         keepalive_seconds=300,
         heartbeat_minutes=0,
         tagall_limit=40,
+        official_group_id=0,
+        hclaim_cooldown_hours=24,
+        market_pool_size=10,
+        market_refresh_price=5000,
+        market_sell_back_percent=50,
     )
 
 

@@ -446,16 +446,6 @@ async def search_cmd(message: Message, session: AsyncSession) -> None:
     await send_text(message, "<b>Search</b>\n" + "\n".join(lines), ephemeral=True)
 
 
-@router.message(Command("claimlist"))
-async def claimlist_cmd(message: Message, session: AsyncSession) -> None:
-    spawn = await session.get(Spawn, message.chat.id)
-    if spawn is None or spawn.expires_at <= now_ts():
-        await send_text(message, "Nothing is waiting in this chat.", ephemeral=True)
-        return
-    left = spawn.expires_at - now_ts()
-    await send_text(message, f"A character is still up for {format_duration(left)}.", ephemeral=True)
-
-
 @router.message(Command("stats", "server"))
 async def stats_cmd(message: Message, session: AsyncSession, settings: Settings, bridge: KurigramBridge, player: User) -> None:
     users, characters, groups = await global_counts(session)

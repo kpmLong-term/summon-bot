@@ -51,6 +51,14 @@ PLAYER_COMMANDS = [
 ]
 
 GROUP_COMMANDS = [
+    BotCommand(command="hclaim", description="Daily weighted claim"),
+    BotCommand(command="claimlist", description="Hclaim weight list", is_ephemeral=True),
+    BotCommand(command="hstats", description="Detailed stats", is_ephemeral=True),
+    BotCommand(command="nguess", description="Name quiz"),
+    BotCommand(command="nguess_end", description="Close open quizzes"),
+    BotCommand(command="auctionlist", description="Open auctions", is_ephemeral=True),
+    BotCommand(command="mybids", description="Your bids", is_ephemeral=True),
+    BotCommand(command="inv", description="Inventory", is_ephemeral=True),
     BotCommand(command="spawn", description="Force the next spawn"),
     BotCommand(command="checkspawn", description="Spawn progress", is_ephemeral=True),
     BotCommand(command="claimlist", description="Active spawn timer", is_ephemeral=True),
@@ -61,6 +69,13 @@ GROUP_COMMANDS = [
 ]
 
 ADMIN_COMMANDS = [
+    BotCommand(command="setclaim", description="Set hclaim weight"),
+    BotCommand(command="remove", description="Remove user character"),
+    BotCommand(command="cshop000000", description="Rotating market pool"),
+    BotCommand(command="cancelauction", description="Cancel your auction"),
+    BotCommand(command="pinfo", description="Premium info", is_ephemeral=True),
+    BotCommand(command="unpremium", description="Strip premium"),
+    BotCommand(command="backup", description="Backup database now", is_ephemeral=True),
     BotCommand(command="ban", description="Ban a replied user"),
     BotCommand(command="unban", description="Unban a user"),
     BotCommand(command="tagall", description="Mention tracked members"),

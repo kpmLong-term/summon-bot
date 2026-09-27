@@ -74,6 +74,11 @@ class Settings:
     keepalive_seconds: int
     heartbeat_minutes: int
     tagall_limit: int
+    official_group_id: int
+    hclaim_cooldown_hours: int
+    market_pool_size: int
+    market_refresh_price: int
+    market_sell_back_percent: int
 
     @property
     def database_backend(self) -> str:
@@ -126,6 +131,11 @@ class Settings:
             keepalive_seconds=max(60, _int("KEEPALIVE_SECONDS", 300)),
             heartbeat_minutes=max(0, _int("HEARTBEAT_MINUTES", 0)),
             tagall_limit=max(5, min(100, _int("TAGALL_LIMIT", 40))),
+            official_group_id=_int("OFFICIAL_GROUP_ID", 0),
+            hclaim_cooldown_hours=max(1, _int("HCLAIM_COOLDOWN_HOURS", 24)),
+            market_pool_size=max(3, _int("MARKET_POOL_SIZE", 10)),
+            market_refresh_price=max(0, _int("MARKET_REFRESH_PRICE", 5000)),
+            market_sell_back_percent=max(1, min(100, _int("MARKET_SELL_BACK_PERCENT", 50))),
         )
 
     @property

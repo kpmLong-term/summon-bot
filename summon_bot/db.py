@@ -42,6 +42,8 @@ class User(Base):
     quest_daily_claimed: Mapped[bool] = mapped_column(Boolean, default=False)
     subscription_state: Mapped[str] = mapped_column(String(16), default="")
     last_seen: Mapped[int] = mapped_column(Integer, default=0)
+    last_hclaim: Mapped[int] = mapped_column(Integer, default=0)
+    last_hclaim_count: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Group(Base):
@@ -188,6 +190,35 @@ class MediaCache(Base):
     __tablename__ = "media_cache"
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     file_id: Mapped[str] = mapped_column(String(256))
+
+
+class ClaimList(Base):
+    __tablename__ = "claim_list"
+    rarity_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rarity_key: Mapped[str] = mapped_column(String(32))
+    chance: Mapped[float] = mapped_column(default=1.0)
+
+
+class MarketPool(Base):
+    __tablename__ = "market_pool"
+    character_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    added_at: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class UserInventory(Base):
+    __tablename__ = "user_inventory"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    item_id: Mapped[str] = mapped_column(String(32))
+    uses_remaining: Mapped[int] = mapped_column(Integer, default=1)
+    expires_at: Mapped[int] = mapped_column(Integer)
+
+
+class UserCooldown(Base):
+    __tablename__ = "user_cooldowns"
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    action: Mapped[str] = mapped_column(String(16), primary_key=True)
+    until_ts: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Database:

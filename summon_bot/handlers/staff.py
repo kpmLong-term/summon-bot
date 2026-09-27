@@ -123,6 +123,8 @@ async def checkspawn_cmd(message: Message, session: AsyncSession, settings: Sett
     extra = ""
     if spawn and spawn.expires_at > now_ts():
         extra = f"\nA spawn is live for {format_duration(spawn.expires_at - now_ts())}."
+    elif spawn:
+        extra = "\nLast spawn expired; chat for the next one."
     await send_text(
         message,
         f"Progress {group.message_count}/{group.spawn_every}. Enabled {group.enabled}.{extra}",
@@ -292,7 +294,7 @@ async def updatechar_cmd(message: Message, session: AsyncSession, player: User, 
     await send_text(message, f"Updated #{character.id} {h(character.name)}.")
 
 
-@router.message(Command("delete", "remove"))
+@router.message(Command("delete"))
 async def delete_cmd(message: Message, session: AsyncSession, player: User, settings: Settings) -> None:
     if not await has_power(session, settings, player.id, "chars"):
         await _deny(message)
