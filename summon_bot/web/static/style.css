@@ -1,0 +1,79 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0a10;
+  --panel: rgba(255, 255, 255, 0.06);
+  --text: #f6efe3;
+  --accent: #8fd3ff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: radial-gradient(circle at 20% 20%, #1a1430, var(--bg));
+  color: var(--text);
+  overflow: hidden;
+}
+
+#canvas-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+canvas { display: block; width: 100%; height: 100%; }
+
+#ui {
+  position: relative;
+  z-index: 2;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 16px;
+  pointer-events: none;
+}
+
+.panel {
+  pointer-events: auto;
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+}
+
+.meta { opacity: 0.85; margin: 0 0 10px; font-size: 0.95rem; }
+
+.card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 42vh;
+  overflow: auto;
+}
+
+.card-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.card-list li.active { color: var(--accent); }
+
+.err { color: #ffb4a8; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(143, 211, 255, 0.15);
+  font-size: 0.8rem;
+}

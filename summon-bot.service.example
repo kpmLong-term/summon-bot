@@ -1,0 +1,14 @@
+[Unit]
+Description=Summon Telegram bot
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/summon-bot
+EnvironmentFile=/opt/summon-bot/.env
+ExecStart=/opt/summon-bot/.venv/bin/python supervisor.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

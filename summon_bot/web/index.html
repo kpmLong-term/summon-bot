@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Summon album</title>
+  <link rel="stylesheet" href="./static/style.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.min.js"></script>
+</head>
+<body>
+  <div id="canvas-wrap"></div>
+  <div id="ui">
+    <div class="panel">
+      <h1 id="title">Summon</h1>
+      <p class="meta" id="meta">Loading…</p>
+      <span class="badge" id="badge">…</span>
+    </div>
+    <div class="panel">
+      <ul class="card-list" id="cards"></ul>
+    </div>
+  </div>
+  <script type="module" src="./static/app.js"></script>
+</body>
+</html>
