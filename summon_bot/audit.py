@@ -48,6 +48,13 @@ async def close_mongo() -> None:
     _mongo_client = None
 
 
+def staff_detail(actor_id: int, chat_id: int, note: str = "") -> str:
+    line = f"by {actor_id} · chat {chat_id}"
+    if note:
+        line = f"{line} · {note}"
+    return line
+
+
 def mongo_status() -> str:
     return "on" if _mongo_db is not None else "off"
 

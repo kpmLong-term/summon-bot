@@ -6,7 +6,7 @@ import asyncio
 import hmac
 import os
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import Settings
 from ..db import Alias, Card, Character, Group, Spawn, Sudo, User
 from ..game import RARITY_BY_KEY, format_duration, normalize_name, now_ts, rarity_from_text
-from ..audit import audit
+from ..audit import audit, staff_detail
 from ..keyboards import confirm_keyboard, copy_keyboard, owner_keyboard
 from ..repo import (
     add_warning,
@@ -61,7 +61,7 @@ async def ban_cmd(message: Message, session: AsyncSession, player: User, setting
         return
     row.banned = True
     await send_text(message, f"Banned {h(target.full_name)}.")
-    await audit(message.bot, settings, "Ban", f"{target.id} in {message.chat.id}")
+    await audit(message.bot, settings, "Ban", staff_detail(player.id, message.chat.id, str(target.id)))
 
 
 @router.message(Command("unban"))
@@ -84,10 +84,11 @@ async def unban_cmd(message: Message, session: AsyncSession, player: User, setti
         return
     row.banned = False
     await send_text(message, f"Unbanned {target_id}.")
+    await audit(message.bot, settings, "Unban", staff_detail(player.id, message.chat.id, str(target_id)))
 
 
 @router.message(Command("warn"))
-async def warn_cmd(message: Message, session: AsyncSession, player: User, settings: Settings) -> None:
+async def warn_cmd(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> None:
     if not await has_power(session, settings, player.id, "moderate"):
         await _deny(message)
         return
@@ -96,8 +97,23 @@ async def warn_cmd(message: Message, session: AsyncSession, player: User, settin
         return
     reason = (message.text or "").split(maxsplit=1)
     text = reason[1] if len(reason) > 1 else "no reason"
-    count = await add_warning(session, message.chat.id, message.reply_to_message.from_user.id, text)
-    await send_text(message, f"Warning {count} for {h(message.reply_to_message.from_user.full_name)}: {h(text)}")
+    target = message.reply_to_message.from_user
+    count = await add_warning(session, message.chat.id, target.id, text)
+    group = await ensure_group(session, message.chat.id, message.chat.title or "", settings)
+    limit = group.warn_limit or 3
+    await send_text(message, f"Warning {count}/{limit} for {h(target.full_name)}: {h(text)}")
+    await audit(bot, settings, "Warn", staff_detail(player.id, message.chat.id, f"{target.id} · {count}/{limit} · {text[:80]}"))
+    if count < limit or settings.is_owner(target.id):
+        return
+    row = await session.get(User, target.id)
+    if row:
+        row.banned = True
+    try:
+        await bot.ban_chat_member(message.chat.id, target.id)
+    except Exception:
+        pass
+    await send_text(message, f"{h(target.full_name)} hit {limit} warnings and is banned.")
+    await audit(bot, settings, "Auto ban", staff_detail(player.id, message.chat.id, str(target.id)))
 
 
 @router.message(Command("spawn"))
@@ -398,6 +414,19 @@ async def savegroup_cmd(message: Message, session: AsyncSession, settings: Setti
     await ensure_group(session, message.chat.id, message.chat.title or "", settings)
     await send_text(message, "This group will spawn characters.")
     await audit(message.bot, settings, "Group saved", f"{message.chat.title} · {message.chat.id}")
+
+
+@router.message(Command("groups"))
+async def groups_cmd(message: Message, session: AsyncSession, player: User, settings: Settings) -> None:
+    if not settings.is_owner(player.id):
+        await _deny(message)
+        return
+    rows = (await session.scalars(select(Group).order_by(Group.title).limit(20))).all()
+    if not rows:
+        await send_text(message, "No groups saved yet.", ephemeral=True)
+        return
+    lines = [f"• {h(row.title or 'group')} · <code>{row.chat_id}</code> · warns {row.warn_limit}" for row in rows]
+    await send_text(message, "<b>Groups</b>\n" + "\n".join(lines), ephemeral=True)
 
 
 @router.message(Command("broadcast"))

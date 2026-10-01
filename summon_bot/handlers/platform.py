@@ -341,8 +341,9 @@ async def bot_membership(event, session: AsyncSession, settings: Settings, bot: 
 
 
 @router.chat_member()
-async def member_arrived(event, settings: Settings, bot: Bot) -> None:
+async def member_arrived(event, session: AsyncSession, settings: Settings, bot: Bot) -> None:
     from ..audit import audit
+    from ..db import Group
 
     old = getattr(event.old_chat_member, "status", "")
     new = getattr(event.new_chat_member, "status", "")
@@ -355,5 +356,18 @@ async def member_arrived(event, settings: Settings, bot: Bot) -> None:
         bot,
         settings,
         "Member joined",
-        f"{h(user.full_name)} ({user.id}) · {h(event.chat.title)} · {event.chat.id}",
+        f"{user.full_name} ({user.id}) · {event.chat.title} · {event.chat.id}",
     )
+    group = await session.get(Group, event.chat.id)
+    welcome = (group.welcome if group else "").strip()
+    if not welcome:
+        return
+    text = (
+        welcome.replace("{name}", user.full_name or "friend")
+        .replace("{username}", f"@{user.username}" if user.username else user.full_name)
+        .replace("{chat}", event.chat.title or "the group")
+    )
+    try:
+        await bot.send_message(event.chat.id, h(text)[:500])
+    except Exception:
+        return

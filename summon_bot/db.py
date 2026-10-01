@@ -6,7 +6,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, String, event
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, String, event, inspect, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -56,6 +56,8 @@ class Group(Base):
     spawn_every: Mapped[int] = mapped_column(Integer, default=100)
     message_count: Mapped[int] = mapped_column(Integer, default=0)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    welcome: Mapped[str] = mapped_column(String(500), default="")
+    warn_limit: Mapped[int] = mapped_column(Integer, default=3)
 
 
 class GroupMember(Base):
@@ -255,6 +257,7 @@ class Database:
     async def _create(self) -> None:
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(_add_group_columns)
 
     async def init(self) -> None:
         try:
@@ -280,3 +283,11 @@ class Database:
             except Exception:
                 await session.rollback()
                 raise
+
+
+def _add_group_columns(sync_conn) -> None:
+    cols = {col["name"] for col in inspect(sync_conn).get_columns("groups")}
+    if "welcome" not in cols:
+        sync_conn.execute(text("ALTER TABLE groups ADD COLUMN welcome VARCHAR(500) DEFAULT ''"))
+    if "warn_limit" not in cols:
+        sync_conn.execute(text("ALTER TABLE groups ADD COLUMN warn_limit INTEGER DEFAULT 3"))

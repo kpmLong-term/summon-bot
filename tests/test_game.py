@@ -21,7 +21,7 @@ from summon_bot.config import (
     resolve_mongo_uri,
     resolve_sql_url,
 )
-from summon_bot.db import Card, Character, Database, User
+from summon_bot.db import Card, Character, Database, Group, User
 from summon_bot.game import now_ts
 from summon_bot.maintenance import cleanup_inactive
 from summon_bot.game import (
@@ -278,6 +278,18 @@ class EconomyFlowTest(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(await session.get(User, 90))
             self.assertIsNotNone(await session.get(User, 91))
             self.assertIsNotNone(await session.get(User, 92))
+
+    async def test_group_welcome_column(self):
+        from summon_bot.repo import ensure_group
+
+        async with self.db.session() as session:
+            group = await ensure_group(session, -55, "Hall", self.settings)
+            group.welcome = "Hello {name}"
+            group.warn_limit = 2
+        async with self.db.session() as session:
+            group = await session.get(Group, -55)
+            self.assertEqual(group.welcome, "Hello {name}")
+            self.assertEqual(group.warn_limit, 2)
 
     async def test_postgres_falls_back_to_sqlite(self):
         tuned = replace(

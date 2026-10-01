@@ -29,6 +29,7 @@ def extract_user(event: TelegramObject) -> TgUser | None:
             "inline_query",
             "pre_checkout_query",
             "my_chat_member",
+            "chat_member",
             "chat_join_request",
             "purchased_paid_media",
             "business_message",

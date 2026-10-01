@@ -9,8 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
-from ..db import GroupMember, User
+from ..db import Group, GroupMember, User
+from ..repo import ensure_group
 from ..repo import has_power
+from ..audit import audit, staff_detail
+from ..recent import forget, recent_ids
 from ..telegram_ui import h, send_text
 
 router = Router(name="manage")
@@ -155,3 +158,143 @@ async def pin_cmd(message: Message, session: AsyncSession, player: User, setting
         await send_text(message, "Pinned.")
     except Exception as exc:
         await send_text(message, f"Pin failed: {h(exc)}", ephemeral=True)
+
+
+async def _group_admin(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> bool:
+    if message.chat.type == "private":
+        await send_text(message, "Use this inside a group.", ephemeral=True)
+        return False
+    if settings.is_owner(player.id) or await has_power(session, settings, player.id, "moderate"):
+        return True
+    try:
+        member = await bot.get_chat_member(message.chat.id, player.id)
+        if member.status in {"administrator", "creator"}:
+            return True
+    except Exception:
+        pass
+    await send_text(message, "Only a group admin, sudo, or the owner can do that.", ephemeral=True)
+    return False
+
+
+@router.message(Command("setwelcome"))
+async def setwelcome_cmd(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> None:
+    if not await _group_admin(message, session, player, settings, bot):
+        return
+    text = (message.text or "").split(maxsplit=1)
+    if len(text) < 2:
+        await send_text(message, "Usage: /setwelcome Hello {name} in {chat}", ephemeral=True)
+        return
+    group = await ensure_group(session, message.chat.id, message.chat.title or "", settings)
+    group.welcome = text[1][:500]
+    await send_text(message, "Welcome saved. Placeholders: {name} {username} {chat}")
+    await audit(bot, settings, "Welcome set", staff_detail(player.id, message.chat.id))
+
+
+@router.message(Command("clearwelcome"))
+async def clearwelcome_cmd(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> None:
+    if not await _group_admin(message, session, player, settings, bot):
+        return
+    group = await session.get(Group, message.chat.id)
+    if group:
+        group.welcome = ""
+    await send_text(message, "Welcome cleared.")
+    await audit(bot, settings, "Welcome cleared", staff_detail(player.id, message.chat.id))
+
+
+@router.message(Command("purge"))
+async def purge_cmd(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> None:
+    if not await _group_admin(message, session, player, settings, bot):
+        return
+    parts = (message.text or "").split()
+    limit = 10
+    if len(parts) > 1 and parts[1].isdigit():
+        limit = max(1, min(25, int(parts[1])))
+    ids = recent_ids(message.chat.id, limit)
+    if message.reply_to_message:
+        ids.append(message.reply_to_message.message_id)
+    ids.append(message.message_id)
+    removed = 0
+    for message_id in dict.fromkeys(ids):
+        try:
+            await bot.delete_message(message.chat.id, message_id)
+            removed += 1
+        except Exception:
+            continue
+    forget(message.chat.id, ids)
+    await audit(bot, settings, "Purge", staff_detail(player.id, message.chat.id, f"deleted {removed}"))
+
+
+@router.message(Command("lock"))
+async def lock_cmd(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> None:
+    if not await _group_admin(message, session, player, settings, bot):
+        return
+    try:
+        await bot.set_chat_permissions(message.chat.id, ChatPermissions(can_send_messages=False))
+        await send_text(message, "Chat locked. Members cannot send messages.")
+        await audit(bot, settings, "Chat locked", staff_detail(player.id, message.chat.id))
+    except Exception as exc:
+        await send_text(message, f"Lock failed: {h(exc)}", ephemeral=True)
+
+
+@router.message(Command("unlock"))
+async def unlock_cmd(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> None:
+    if not await _group_admin(message, session, player, settings, bot):
+        return
+    open_chat = ChatPermissions(
+        can_send_messages=True,
+        can_send_audios=True,
+        can_send_documents=True,
+        can_send_photos=True,
+        can_send_videos=True,
+        can_send_video_notes=True,
+        can_send_voice_notes=True,
+        can_send_polls=True,
+        can_send_other_messages=True,
+        can_add_web_page_previews=True,
+    )
+    try:
+        await bot.set_chat_permissions(message.chat.id, open_chat)
+        await send_text(message, "Chat unlocked.")
+        await audit(bot, settings, "Chat unlocked", staff_detail(player.id, message.chat.id))
+    except Exception as exc:
+        await send_text(message, f"Unlock failed: {h(exc)}", ephemeral=True)
+
+
+@router.message(Command("warns"))
+async def warns_cmd(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> None:
+    if not await _group_admin(message, session, player, settings, bot):
+        return
+    if not message.reply_to_message or not message.reply_to_message.from_user:
+        await send_text(message, "Reply to a member to see their warnings.", ephemeral=True)
+        return
+    from ..db import Warning
+
+    target = message.reply_to_message.from_user
+    rows = (
+        await session.scalars(
+            select(Warning)
+            .where(Warning.chat_id == message.chat.id, Warning.user_id == target.id)
+            .order_by(Warning.id.desc())
+            .limit(8)
+        )
+    ).all()
+    if not rows:
+        await send_text(message, f"{h(target.full_name)} has no warnings here.", ephemeral=True)
+        return
+    lines = [f"• {h(row.reason)}" for row in rows]
+    await send_text(message, f"<b>{h(target.full_name)}</b> · {len(rows)} shown\n" + "\n".join(lines), ephemeral=True)
+
+
+@router.message(Command("setwarns"))
+async def setwarns_cmd(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> None:
+    if not await _group_admin(message, session, player, settings, bot):
+        return
+    parts = (message.text or "").split()
+    if len(parts) < 2 or not parts[1].isdigit():
+        await send_text(message, "Usage: /setwarns 3", ephemeral=True)
+        return
+    limit = max(1, min(8, int(parts[1])))
+    group = await ensure_group(session, message.chat.id, message.chat.title or "", settings)
+    group.warn_limit = limit
+    await send_text(message, f"This group auto-bans at {limit} warnings.")
+    await audit(bot, settings, "Warn limit", staff_detail(player.id, message.chat.id, str(limit)))

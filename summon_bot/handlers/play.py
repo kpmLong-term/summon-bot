@@ -539,6 +539,9 @@ async def group_text(message: Message, session: AsyncSession, player: User | Non
         return
     if message.from_user:
         await track_group_member(session, message.chat.id, message.from_user)
+    from ..recent import remember
+
+    remember(message.chat.id, message.message_id)
     async with _lock(message.chat.id):
         group = await ensure_group(session, message.chat.id, message.chat.title or "", settings)
         claimed = await try_claim(session, message.chat.id, player, message.text)

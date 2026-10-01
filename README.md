@@ -50,8 +50,10 @@ In a group, chat until a portrait appears, then type the name. The hint button u
 | /gift /pay /redeem | Move cards and coins (gift notifies receiver in DM) |
 | /search /check /nguess /top | Lookup, quiz, leaderboard |
 | /premium /vault | Stars invoice and paid-media pull |
-| /spawn /changetime /chance /ban /kick /mute /unmute /pin /tagall /addchar | Sudo and admin tools |
+| /ban /unban /warn /warns /setwarns /kick /mute /purge /lock /setwelcome /groups | Admin, sudo, and owner tools |
 | /owner /gencode /broadcast /stars /refund /sublink /backup | Owner tools |
+
+Group admins, sudo, and the owner can set a join welcome (`{name}`, `{username}`, `{chat}`), purge messages the bot has seen, and lock the chat. Warnings in the log channel read `by actor · chat · target`. At the group's warn limit (default 3) the member is banned. `/groups` is owner-only.
 
 `/addchar` replies to a photo: `Name | Series | Rarity | optional alias`.
 
