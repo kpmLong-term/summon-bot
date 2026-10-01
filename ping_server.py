@@ -7,7 +7,9 @@ import os
 import time
 import urllib.request
 
-URL = os.getenv("KEEPALIVE_URL", "http://127.0.0.1:8080/ping")
+from summon_bot.config import resolve_keepalive_url
+
+URL = resolve_keepalive_url(os.getenv("KEEPALIVE_URL", ""), int(os.getenv("PORT", "8080") or "8080"))
 INTERVAL = int(os.getenv("KEEPALIVE_SECONDS", "300") or "300")
 
 

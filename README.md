@@ -21,7 +21,9 @@ PostgreSQL is used when `DATABASE_URL` is a `postgresql://` URL. If neither Post
 
 Set `LOG_CHANNEL_ID` to a channel where the bot can post. You will see starts, group joins, gifts, bans, backups, and optional heartbeats (`HEARTBEAT_MINUTES`).
 
-Keep-alive: the bot exposes `GET /ping`. On Render/Railway set `KEEPALIVE_URL=https://your-host/ping` or run `python ping_server.py` beside the bot. `supervisor.py` still restarts after crashes.
+Keep-alive works the same way as a free-host music bot: the process binds `PORT` and serves `GET /health` and `GET /ping`. Every `KEEPALIVE_SECONDS` (default 300) it pings itself. If `KEEPALIVE_URL` is empty it uses `RENDER_EXTERNAL_URL/ping`, then `RAILWAY_PUBLIC_DOMAIN`, then `http://127.0.0.1:$PORT/ping`. `python ping_server.py` is the same loop as a separate process. `supervisor.py` restarts the bot after a crash.
+
+The watchdog starts with the bot: scheduled SQLite or `pg_dump` backups, purge of inactive empty accounts (`INACTIVE_DAYS`), and an optional log-channel heartbeat (`HEARTBEAT_MINUTES`).
 
 Backups land in `data/backups/` on a schedule (`BACKUP_INTERVAL_HOURS`). Owner can run `/backup` anytime. Inactive empty accounts purge when `INACTIVE_DAYS` is greater than zero.
 

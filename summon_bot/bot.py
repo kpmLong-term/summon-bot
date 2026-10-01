@@ -185,6 +185,7 @@ async def run(settings: Settings | None = None) -> None:
         await site.start()
         site_runner = runner
         log.info("http listening on %s:%s", settings.host, settings.port)
+        log.info("Watchdog started (backup, inactive cleanup, keep-alive)")
         if settings.webhook_url:
             await bot.set_webhook(
                 f"{settings.webhook_url}/webhook",

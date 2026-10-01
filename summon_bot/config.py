@@ -25,6 +25,25 @@ def _flag(name: str, default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def resolve_keepalive_url(explicit: str, port: int) -> str:
+    """Public self-ping. Empty uses Render, then Railway, then local /ping."""
+    raw = (explicit or "").strip()
+    if not raw:
+        raw = os.getenv("RENDER_EXTERNAL_URL", "").strip()
+    if not raw:
+        domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
+        if domain:
+            raw = domain if "://" in domain else f"https://{domain}"
+    if not raw:
+        return f"http://127.0.0.1:{port}/ping"
+    raw = raw.rstrip("/")
+    if raw.endswith("/ping") or raw.endswith("/health"):
+        return raw
+    if "://" in raw and raw.count("/") == 2:
+        return f"{raw}/ping"
+    return raw
+
+
 def normalize_database_url(url: str, sqlite_path: Path) -> str:
     url = (url or "").strip()
     if not url:
@@ -127,7 +146,7 @@ class Settings:
             backup_keep=max(3, _int("BACKUP_KEEP", 14)),
             inactive_days=max(0, _int("INACTIVE_DAYS", 90)),
             maintenance_interval_hours=max(1, _int("MAINTENANCE_INTERVAL_HOURS", 24)),
-            keepalive_url=os.getenv("KEEPALIVE_URL", "").strip(),
+            keepalive_url=resolve_keepalive_url(os.getenv("KEEPALIVE_URL", ""), _int("PORT", 8080)),
             keepalive_seconds=max(60, _int("KEEPALIVE_SECONDS", 300)),
             heartbeat_minutes=max(0, _int("HEARTBEAT_MINUTES", 0)),
             tagall_limit=max(5, min(100, _int("TAGALL_LIMIT", 40))),

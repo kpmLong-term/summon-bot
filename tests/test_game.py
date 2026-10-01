@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import os
 import tempfile
 import time
 import unittest
@@ -11,7 +12,7 @@ from urllib.parse import urlencode
 from sqlalchemy import select
 
 from summon_bot.art import render_card, render_spawn
-from summon_bot.config import Settings, normalize_database_url
+from summon_bot.config import Settings, normalize_database_url, resolve_keepalive_url
 from summon_bot.db import Card, Character, Database, User
 from summon_bot.game import (
     daily_payout,
@@ -115,6 +116,21 @@ class GameRulesTest(unittest.TestCase):
         url = normalize_database_url("postgres://user:pass@localhost/db", Path("x.db"))
         self.assertTrue(url.startswith("postgresql+asyncpg://"))
         self.assertTrue(normalize_database_url("", Path("x.db")).startswith("sqlite+aiosqlite://"))
+
+    def test_keepalive_url(self):
+        self.assertEqual(resolve_keepalive_url("https://host.example/ping", 8080), "https://host.example/ping")
+        self.assertEqual(resolve_keepalive_url("https://host.example", 8080), "https://host.example/ping")
+        saved = {key: os.environ.pop(key, None) for key in ("RENDER_EXTERNAL_URL", "RAILWAY_PUBLIC_DOMAIN")}
+        try:
+            self.assertEqual(resolve_keepalive_url("", 9000), "http://127.0.0.1:9000/ping")
+            os.environ["RENDER_EXTERNAL_URL"] = "https://summon.onrender.com"
+            self.assertEqual(resolve_keepalive_url("", 8080), "https://summon.onrender.com/ping")
+        finally:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def test_art(self):
         with tempfile.TemporaryDirectory() as raw:

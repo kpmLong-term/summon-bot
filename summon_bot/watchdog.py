@@ -20,16 +20,18 @@ _started_at = time.time()
 
 
 async def keepalive_loop(settings: Settings) -> None:
-    if not settings.keepalive_url:
+    """Self-ping /ping so free web hosts do not sleep the process. Same idea as Videl's keep-alive thread."""
+    url = (settings.keepalive_url or "").strip()
+    if not url:
         return
-    url = settings.keepalive_url
+    log.info("Keep-alive started → %s every %ss", url, settings.keepalive_seconds)
     async with aiohttp.ClientSession() as http:
         while True:
             try:
-                async with http.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    log.debug("keepalive %s -> %s", url, resp.status)
-            except Exception:
-                log.warning("keepalive ping failed")
+                async with http.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                    log.info("Keep-alive ping sent → %s (%s)", url, resp.status)
+            except Exception as exc:
+                log.warning("Keep-alive ping failed: %s", exc)
             await asyncio.sleep(max(60, settings.keepalive_seconds))
 
 
