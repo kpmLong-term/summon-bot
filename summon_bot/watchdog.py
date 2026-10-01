@@ -64,7 +64,7 @@ async def maintenance_loop(bot: Bot, settings: Settings, database: Database) -> 
                     bot,
                     settings,
                     "Cleanup",
-                    f"Removed {removed} inactive accounts · {total} players remain",
+                    f"Removed {removed} empty accounts idle for {settings.inactive_days} days · {total} players remain",
                 )
         except Exception:
             log.exception("maintenance loop failed")

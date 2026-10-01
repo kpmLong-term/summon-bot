@@ -47,4 +47,6 @@ Button colors, ephemeral commands, rich help, reactions, Stars, paid media, and 
 
 
 def home_text(name: str) -> str:
-    return f"<b>Welcome, {name}.</b>\nCharacters spawn in groups. Guess the name, keep the card, trade the spare.\n\n{HELP_HOME}"
+    from .richfmt import welcome_html
+
+    return welcome_html(name, HELP_HOME)

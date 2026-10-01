@@ -8,6 +8,10 @@ from typing import TYPE_CHECKING
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import InputRichMessage
+from richgram import rich_to_plain
+
+from .richfmt import log_html
 
 if TYPE_CHECKING:
     from .config import Settings
@@ -44,14 +48,29 @@ async def close_mongo() -> None:
     _mongo_client = None
 
 
+def mongo_status() -> str:
+    return "on" if _mongo_db is not None else "off"
+
+
 async def audit(bot: Bot | None, settings: Settings, event: str, detail: str = "") -> None:
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    line = f"<b>{event}</b>\n{detail}\n<code>{stamp}</code>" if detail else f"<b>{event}</b>\n<code>{stamp}</code>"
+    html = log_html(event, detail, stamp)
     if settings.log_channel_id and bot is not None:
         try:
-            await bot.send_message(settings.log_channel_id, line[:4096], disable_notification=True)
+            await bot.send_rich_message(
+                settings.log_channel_id,
+                InputRichMessage(html=html),
+                disable_notification=True,
+            )
         except TelegramBadRequest:
-            log.warning("log channel send failed")
+            try:
+                await bot.send_message(
+                    settings.log_channel_id,
+                    rich_to_plain(html)[:4096],
+                    disable_notification=True,
+                )
+            except TelegramBadRequest:
+                log.warning("log channel send failed")
         except Exception:
             log.exception("log channel error")
     if _mongo_db is not None:

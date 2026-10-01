@@ -17,9 +17,11 @@ python -m summon_bot
 
 With `WEBHOOK_URL` empty, the process long-polls and also serves `/health` and `/app/` on `PORT` for a later public deploy. Set `WEBAPP_URL` to that public HTTPS origin so the album button appears. Telegram only opens Mini Apps from a public URL.
 
-PostgreSQL is used when `DATABASE_URL` is a `postgresql://` URL. If neither Postgres nor Mongo is configured for game data, everything lives in `data/summon.db`. `MONGO_URI` is optional and only mirrors audit events (starts, groups, gifts, backups).
+PostgreSQL is used when `DATABASE_URL` (or `POSTGRES_URL`) answers. If that URL is missing or the server refuses the connection, game data falls back to `data/summon.db`. MongoDB (`MONGO_URI` or `MONGO_DB_URL`) only mirrors the log. If Mongo is missing or down, the bot keeps running on SQL.
 
-Set `LOG_CHANNEL_ID` to a channel where the bot can post. You will see starts, group joins, gifts, bans, backups, and optional heartbeats (`HEARTBEAT_MINUTES`).
+Set `LOG_CHANNEL_ID` (also accepted as `LOGGER_ID` or `LOGIC_CHANNEL_ID`) to a channel where the bot can post. Starts, group add and leave, new members, gifts, bans, mutes, backups, and cleanups go there as rich messages built with [richgram](https://github.com/Badmunda05/richgram). Optional heartbeats use `HEARTBEAT_MINUTES`.
+
+Empty accounts with no cards, no claims, no shop or auction activity, and no visit for `INACTIVE_DAYS` (default 30) are removed in batches of `INACTIVE_BATCH` (default 200). The owner account is never removed. Set `INACTIVE_DAYS=0` to turn cleanup off.
 
 Keep-alive works the same way as a free-host music bot: the process binds `PORT` and serves `GET /health` and `GET /ping`. Every `KEEPALIVE_SECONDS` (default 300) it pings itself. If `KEEPALIVE_URL` is empty it uses `RENDER_EXTERNAL_URL/ping`, then `RAILWAY_PUBLIC_DOMAIN`, then `http://127.0.0.1:$PORT/ping`. `python ping_server.py` is the same loop as a separate process. `supervisor.py` restarts the bot after a crash.
 
@@ -48,7 +50,7 @@ In a group, chat until a portrait appears, then type the name. The hint button u
 | /gift /pay /redeem | Move cards and coins (gift notifies receiver in DM) |
 | /search /check /nguess /top | Lookup, quiz, leaderboard |
 | /premium /vault | Stars invoice and paid-media pull |
-| /spawn /changetime /chance /ban /kick /pin /tagall /addchar | Sudo and admin tools |
+| /spawn /changetime /chance /ban /kick /mute /unmute /pin /tagall /addchar | Sudo and admin tools |
 | /owner /gencode /broadcast /stars /refund /sublink /backup | Owner tools |
 
 `/addchar` replies to a photo: `Name | Series | Rarity | optional alias`.

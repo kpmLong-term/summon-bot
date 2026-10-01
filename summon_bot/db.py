@@ -1,7 +1,8 @@
-"""SQLAlchemy models. SQLite for local play, PostgreSQL when DATABASE_URL is set."""
+"""SQLAlchemy models. PostgreSQL when it answers, SQLite when it does not."""
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -10,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from .config import Settings
+
+log = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -224,8 +227,23 @@ class UserCooldown(Base):
 class Database:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+        self.backend = "sqlite"
+        self.engine = None
+        self.factory = None
+        self._bind(settings.database_url)
+
+    def _bind(self, url: str) -> None:
+        kwargs: dict = {"pool_pre_ping": True}
+        if url.startswith("postgresql"):
+            kwargs["connect_args"] = {"timeout": 5}
+        self.engine = create_async_engine(url, **kwargs)
         self.factory = async_sessionmaker(self.engine, expire_on_commit=False)
+        if url.startswith("sqlite"):
+            self.backend = "sqlite"
+        elif "postgresql" in url:
+            self.backend = "postgresql"
+        else:
+            self.backend = "other"
 
         @event.listens_for(self.engine.sync_engine, "connect")
         def _sqlite_pragmas(dbapi_conn, _record) -> None:  # type: ignore[no-untyped-def]
@@ -234,9 +252,21 @@ class Database:
                 cursor.execute("PRAGMA foreign_keys=ON")
                 cursor.close()
 
-    async def init(self) -> None:
+    async def _create(self) -> None:
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+    async def init(self) -> None:
+        try:
+            await self._create()
+            return
+        except Exception as exc:
+            if self.backend == "sqlite":
+                raise
+            log.warning("PostgreSQL unavailable (%s); using SQLite at %s", type(exc).__name__, self.settings.sqlite_path)
+        await self.engine.dispose()
+        self._bind(f"sqlite+aiosqlite:///{self.settings.sqlite_path}")
+        await self._create()
 
     async def close(self) -> None:
         await self.engine.dispose()

@@ -338,3 +338,22 @@ async def bot_membership(event, session: AsyncSession, settings: Settings, bot: 
         if group:
             group.enabled = False
         await audit(bot, settings, "Group left", f"{h(chat.title)} · {chat.id}")
+
+
+@router.chat_member()
+async def member_arrived(event, settings: Settings, bot: Bot) -> None:
+    from ..audit import audit
+
+    old = getattr(event.old_chat_member, "status", "")
+    new = getattr(event.new_chat_member, "status", "")
+    if new not in {"member", "administrator"} or old not in {"left", "kicked", ""}:
+        return
+    user = event.new_chat_member.user
+    if user.is_bot:
+        return
+    await audit(
+        bot,
+        settings,
+        "Member joined",
+        f"{h(user.full_name)} ({user.id}) · {h(event.chat.title)} · {event.chat.id}",
+    )

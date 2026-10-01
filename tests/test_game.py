@@ -3,6 +3,7 @@ import hmac
 import json
 import os
 import tempfile
+from dataclasses import replace
 import time
 import unittest
 from pathlib import Path
@@ -12,8 +13,17 @@ from urllib.parse import urlencode
 from sqlalchemy import select
 
 from summon_bot.art import render_card, render_spawn
-from summon_bot.config import Settings, normalize_database_url, resolve_keepalive_url
+from summon_bot.config import (
+    Settings,
+    normalize_database_url,
+    resolve_keepalive_url,
+    resolve_log_channel_id,
+    resolve_mongo_uri,
+    resolve_sql_url,
+)
 from summon_bot.db import Card, Character, Database, User
+from summon_bot.game import now_ts
+from summon_bot.maintenance import cleanup_inactive
 from summon_bot.game import (
     daily_payout,
     hint_text,
@@ -89,6 +99,7 @@ def settings(tmp: Path) -> Settings:
         market_pool_size=10,
         market_refresh_price=5000,
         market_sell_back_percent=50,
+        inactive_batch=200,
     )
 
 
@@ -116,6 +127,22 @@ class GameRulesTest(unittest.TestCase):
         url = normalize_database_url("postgres://user:pass@localhost/db", Path("x.db"))
         self.assertTrue(url.startswith("postgresql+asyncpg://"))
         self.assertTrue(normalize_database_url("", Path("x.db")).startswith("sqlite+aiosqlite://"))
+
+    def test_store_aliases(self):
+        saved = {key: os.environ.pop(key, None) for key in ("DATABASE_URL", "POSTGRES_URL", "MONGO_URI", "MONGO_DB_URL", "LOG_CHANNEL_ID", "LOGIC_CHANNEL_ID")}
+        try:
+            os.environ["POSTGRES_URL"] = "postgres://user:pass@localhost/db"
+            self.assertTrue(resolve_sql_url(Path("x.db")).startswith("postgresql+asyncpg://"))
+            os.environ["MONGO_DB_URL"] = "mongodb://localhost/summon"
+            self.assertEqual(resolve_mongo_uri(), "mongodb://localhost/summon")
+            os.environ["LOGIC_CHANNEL_ID"] = "-100123"
+            self.assertEqual(resolve_log_channel_id(), -100123)
+        finally:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def test_keepalive_url(self):
         self.assertEqual(resolve_keepalive_url("https://host.example/ping", 8080), "https://host.example/ping")
@@ -214,6 +241,56 @@ class EconomyFlowTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(streak, 1)
             state, _, _ = await claim_daily(session, player, 5000)
             self.assertEqual(state, "wait")
+
+    async def test_inactive_cleanup_keeps_collectors(self):
+        old = now_ts() - 40 * 86400
+        async with self.db.session() as session:
+            character = await session.scalar(select(Character).limit(1))
+            session.add(
+                User(
+                    id=90,
+                    first_name="Idle",
+                    balance=500,
+                    claims=0,
+                    last_seen=old,
+                    created_at=old,
+                    premium_until=0,
+                )
+            )
+            keeper = User(
+                id=91,
+                first_name="Keeper",
+                balance=500,
+                claims=0,
+                last_seen=old,
+                created_at=old,
+                premium_until=0,
+            )
+            session.add(keeper)
+            await session.flush()
+            session.add(Card(user_id=91, character_id=character.id, source="shop", obtained_at=old))
+            fresh = User(id=92, first_name="Fresh", balance=500, claims=0, last_seen=now_ts(), created_at=now_ts(), premium_until=0)
+            session.add(fresh)
+        tuned = replace(self.settings, inactive_days=30, inactive_batch=50)
+        async with self.db.session() as session:
+            removed = await cleanup_inactive(session, tuned)
+            self.assertEqual(removed, 1)
+            self.assertIsNone(await session.get(User, 90))
+            self.assertIsNotNone(await session.get(User, 91))
+            self.assertIsNotNone(await session.get(User, 92))
+
+    async def test_postgres_falls_back_to_sqlite(self):
+        tuned = replace(
+            self.settings,
+            database_url="postgresql+asyncpg://nope:nope@127.0.0.1:1/none",
+            sqlite_path=Path(self.tmp.name) / "fallback.db",
+        )
+        database = Database(tuned)
+        await database.init()
+        self.assertEqual(database.backend, "sqlite")
+        async with database.session() as session:
+            session.add(User(id=7, first_name="S", balance=1, created_at=1, last_seen=1, premium_until=0))
+        await database.close()
 
 
 class InitDataTest(unittest.TestCase):

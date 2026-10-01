@@ -16,6 +16,8 @@ from aiogram.types import (
     ReactionTypeEmoji,
 )
 
+from richgram import rich_to_plain
+
 from .db import MediaCache
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,7 +72,8 @@ async def send_rich(message: Message, html: str, reply_markup: InlineKeyboardMar
             **kwargs,
         )
     except TelegramBadRequest:
-        return await send_text(message, html, reply_markup, ephemeral=ephemeral)
+        plain = rich_to_plain(html) or html
+        return await send_text(message, plain[:4096], reply_markup, ephemeral=ephemeral)
 
 
 async def _ack(callback: CallbackQuery, text: str | None = None, *, show_alert: bool = False) -> None:

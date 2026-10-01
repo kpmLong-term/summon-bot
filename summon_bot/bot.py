@@ -12,7 +12,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, BotCommandScopeAllChatAdministrators, BotCommandScopeAllGroupChats, BotCommandScopeDefault, ErrorEvent, LinkPreviewOptions
 
-from .audit import audit, close_mongo, init_mongo
+from .audit import audit, mongo_status, close_mongo, init_mongo
 from .bridge import KurigramBridge
 from .config import Settings
 from .db import Database
@@ -80,6 +80,8 @@ ADMIN_COMMANDS = [
     BotCommand(command="unban", description="Unban a user"),
     BotCommand(command="tagall", description="Mention tracked members"),
     BotCommand(command="kick", description="Kick a replied user"),
+    BotCommand(command="mute", description="Mute a replied user"),
+    BotCommand(command="unmute", description="Unmute a replied user"),
     BotCommand(command="pin", description="Pin a replied message"),
     BotCommand(command="warn", description="Warn a replied user"),
     BotCommand(command="addchar", description="Add a character from a photo"),
@@ -194,12 +196,22 @@ async def run(settings: Settings | None = None) -> None:
                 drop_pending_updates=False,
             )
             await setup_commands(bot)
-            await audit(bot, settings, "Online", f"Webhook · {settings.database_backend}")
+            await audit(
+                bot,
+                settings,
+                "Online",
+                f"Webhook · SQL {database.backend} · Mongo {mongo_status()} · idle purge {settings.inactive_days}d",
+            )
             await asyncio.Event().wait()
         else:
             await bot.delete_webhook(drop_pending_updates=False)
             await setup_commands(bot)
-            await audit(bot, settings, "Online", f"Polling · {settings.database_backend}")
+            await audit(
+                bot,
+                settings,
+                "Online",
+                f"Polling · SQL {database.backend} · Mongo {mongo_status()} · idle purge {settings.inactive_days}d",
+            )
             await dispatcher.start_polling(bot, allowed_updates=dispatcher.resolve_used_update_types())
     finally:
         for task in bg_tasks:

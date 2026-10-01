@@ -44,6 +44,34 @@ def resolve_keepalive_url(explicit: str, port: int) -> str:
     return raw
 
 
+def _first_env(*names: str) -> str:
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def resolve_log_channel_id() -> int:
+    """Log channel. LOG_CHANNEL_ID, Videl's LOGGER_ID, or LOGIC_CHANNEL_ID."""
+    raw = _first_env("LOG_CHANNEL_ID", "LOGGER_ID", "LOGIC_CHANNEL_ID")
+    if not raw:
+        return 0
+    try:
+        return int(raw)
+    except ValueError:
+        return 0
+
+
+def resolve_mongo_uri() -> str:
+    return _first_env("MONGO_URI", "MONGO_DB_URL", "MONGODB_URI", "MONGO_URL")
+
+
+def resolve_sql_url(sqlite_path: Path) -> str:
+    raw = _first_env("DATABASE_URL", "POSTGRES_URL", "POSTGRESQL_URL", "PSQL_URL")
+    return normalize_database_url(raw, sqlite_path)
+
+
 def normalize_database_url(url: str, sqlite_path: Path) -> str:
     url = (url or "").strip()
     if not url:
@@ -98,6 +126,7 @@ class Settings:
     market_pool_size: int
     market_refresh_price: int
     market_sell_back_percent: int
+    inactive_batch: int
 
     @property
     def database_backend(self) -> str:
@@ -117,7 +146,7 @@ class Settings:
             bot_token=os.getenv("BOT_TOKEN", "").strip(),
             owner_id=_int("OWNER_ID", 0),
             owner_password=os.getenv("OWNER_PANEL_PASSWORD", "").strip(),
-            database_url=normalize_database_url(os.getenv("DATABASE_URL", ""), sqlite_path),
+            database_url=resolve_sql_url(sqlite_path),
             sqlite_path=sqlite_path,
             data_dir=data_dir,
             api_id=_int("API_ID", 0),
@@ -139,12 +168,12 @@ class Settings:
             refresh_price=max(0, _int("REFRESH_PRICE", 10000)),
             hint_price=max(0, _int("HINT_PRICE", 50)),
             support_url=os.getenv("SUPPORT_URL", "").strip(),
-            log_channel_id=_int("LOG_CHANNEL_ID", 0),
-            mongo_uri=os.getenv("MONGO_URI", "").strip(),
+            log_channel_id=resolve_log_channel_id(),
+            mongo_uri=resolve_mongo_uri(),
             mongo_db_name=os.getenv("MONGO_DB_NAME", "summon_bot").strip() or "summon_bot",
             backup_interval_hours=max(1, _int("BACKUP_INTERVAL_HOURS", 12)),
             backup_keep=max(3, _int("BACKUP_KEEP", 14)),
-            inactive_days=max(0, _int("INACTIVE_DAYS", 90)),
+            inactive_days=max(0, _int("INACTIVE_DAYS", 30)),
             maintenance_interval_hours=max(1, _int("MAINTENANCE_INTERVAL_HOURS", 24)),
             keepalive_url=resolve_keepalive_url(os.getenv("KEEPALIVE_URL", ""), _int("PORT", 8080)),
             keepalive_seconds=max(60, _int("KEEPALIVE_SECONDS", 300)),
@@ -155,6 +184,7 @@ class Settings:
             market_pool_size=max(3, _int("MARKET_POOL_SIZE", 10)),
             market_refresh_price=max(0, _int("MARKET_REFRESH_PRICE", 5000)),
             market_sell_back_percent=max(1, min(100, _int("MARKET_SELL_BACK_PERCENT", 50))),
+            inactive_batch=max(1, min(1000, _int("INACTIVE_BATCH", 200))),
         )
 
     @property

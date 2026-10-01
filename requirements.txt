@@ -1,5 +1,6 @@
 aiogram==3.31.0
 kurigram==2.2.26
+richgram==0.2.0
 SQLAlchemy==2.0.44
 aiosqlite==0.21.0
 asyncpg==0.30.0

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from aiogram import Bot, Router
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import ChatPermissions, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -83,6 +83,63 @@ async def kick_cmd(message: Message, session: AsyncSession, player: User, settin
         await send_text(message, f"Kicked {h(target.full_name)}.")
     except Exception as exc:
         await send_text(message, f"Kick failed: {h(exc)}", ephemeral=True)
+
+
+async def _moderate(session: AsyncSession, settings: Settings, player: User) -> bool:
+    return await has_power(session, settings, player.id, "moderate")
+
+
+@router.message(Command("mute"))
+async def mute_cmd(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> None:
+    if not await _moderate(session, settings, player):
+        await send_text(message, "Sudo only.", ephemeral=True)
+        return
+    if not message.reply_to_message or not message.reply_to_message.from_user:
+        await send_text(message, "Reply to the member you want to mute.", ephemeral=True)
+        return
+    target = message.reply_to_message.from_user
+    if settings.is_owner(target.id):
+        await send_text(message, "Cannot mute the owner.", ephemeral=True)
+        return
+    try:
+        await bot.restrict_chat_member(message.chat.id, target.id, ChatPermissions(can_send_messages=False))
+        await send_text(message, f"Muted {h(target.full_name)}.")
+        from ..audit import audit
+
+        await audit(bot, settings, "Mute", f"{target.id} in {message.chat.id}")
+    except Exception as exc:
+        await send_text(message, f"Mute failed: {h(exc)}", ephemeral=True)
+
+
+@router.message(Command("unmute"))
+async def unmute_cmd(message: Message, session: AsyncSession, player: User, settings: Settings, bot: Bot) -> None:
+    if not await _moderate(session, settings, player):
+        await send_text(message, "Sudo only.", ephemeral=True)
+        return
+    if not message.reply_to_message or not message.reply_to_message.from_user:
+        await send_text(message, "Reply to the member you want to unmute.", ephemeral=True)
+        return
+    target = message.reply_to_message.from_user
+    open_chat = ChatPermissions(
+        can_send_messages=True,
+        can_send_audios=True,
+        can_send_documents=True,
+        can_send_photos=True,
+        can_send_videos=True,
+        can_send_video_notes=True,
+        can_send_voice_notes=True,
+        can_send_polls=True,
+        can_send_other_messages=True,
+        can_add_web_page_previews=True,
+    )
+    try:
+        await bot.restrict_chat_member(message.chat.id, target.id, open_chat)
+        await send_text(message, f"Unmuted {h(target.full_name)}.")
+        from ..audit import audit
+
+        await audit(bot, settings, "Unmute", f"{target.id} in {message.chat.id}")
+    except Exception as exc:
+        await send_text(message, f"Unmute failed: {h(exc)}", ephemeral=True)
 
 
 @router.message(Command("pin"))
